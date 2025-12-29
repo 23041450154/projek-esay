@@ -2,7 +2,8 @@
   "name": "safespace",
   "version": "1.0.0",
   "description": "SafeSpace - Ruang Aman untuk Bercerita (Mental Health Support Space)",
-  "main": "index.js",
+  "main": "api/index.js",
+  "type": "module",
   "scripts": {
     "build": "echo 'No build step required'"
   },
@@ -17,6 +18,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.89.0",
     "bcryptjs": "^3.0.3",
+    "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "uuid": "^9.0.1"
   },
