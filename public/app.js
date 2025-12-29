@@ -20,6 +20,7 @@ const state = {
   companions: [],
   selectedCompanionId: null,
   isSendingMessage: false,
+  anonymousUserMap: new Map(), // Map untuk menyimpan user ID -> nomor anonim
 };
 
 // ============================================
@@ -383,6 +384,9 @@ async function selectSession(sessionId) {
   state.currentSessionId = sessionId;
   state.currentSession = state.sessions.find(s => s.sessionId === sessionId) || null;
   state.lastMessageTime = null;
+  
+  // Reset anonymous user map for new session
+  state.anonymousUserMap.clear();
 
   // Update UI
   document.querySelectorAll('.session-item').forEach((item) => {
@@ -397,10 +401,16 @@ async function selectSession(sessionId) {
   const session = state.sessions.find((s) => s.sessionId === sessionId);
   if (session) {
     const topicEl = document.getElementById('chatTopic');
+    const statusNote = document.getElementById('chatStatusNote');
+    
     if (session.companionName) {
       topicEl.innerHTML = `${escapeHtml(session.topic)} <span class="companion-badge">${escapeHtml(session.companionName)}</span>`;
+      // Show status note for companion chats
+      if (statusNote) statusNote.hidden = false;
     } else {
       topicEl.textContent = session.topic;
+      // Hide status note for regular chats
+      if (statusNote) statusNote.hidden = true;
     }
     
     // Show delete button if user is the creator
@@ -452,6 +462,16 @@ async function loadMessages() {
   }
 }
 
+// Helper function to get anonymous label for user
+function getAnonymousLabel(senderId) {
+  if (!state.anonymousUserMap.has(senderId)) {
+    // Assign new number based on current map size + 1
+    const newNumber = state.anonymousUserMap.size + 1;
+    state.anonymousUserMap.set(senderId, newNumber);
+  }
+  return `Anonim ${state.anonymousUserMap.get(senderId)}`;
+}
+
 function renderMessages() {
   const container = document.getElementById('messagesContainer');
 
@@ -474,9 +494,12 @@ function renderMessages() {
           statusIcon = '<span class="message-status read">✓✓</span>';
         }
         
+        // Get anonymous label for sender
+        const senderLabel = !msg.isOwn ? getAnonymousLabel(msg.senderId) : '';
+        
         return `
     <div class="message ${msg.isOwn ? 'message-self' : 'message-other'}">
-      ${!msg.isOwn ? `<div class="message-sender">${escapeHtml(msg.displayName)}</div>` : ''}
+      ${!msg.isOwn ? `<div class="message-sender">${senderLabel}</div>` : ''}
       <div class="message-text">${escapeHtml(msg.text)}</div>
       <div class="message-time">${timeStr} ${statusIcon}</div>
     </div>
@@ -617,6 +640,7 @@ async function deleteSession(sessionId) {
       state.messages = [];
       document.getElementById('chatHeader').hidden = true;
       document.getElementById('chatInputArea').hidden = true;
+      document.getElementById('chatStatusNote').hidden = true;
       document.getElementById('messagesContainer').innerHTML = '';
       stopPolling();
     }

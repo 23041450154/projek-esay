@@ -457,10 +457,14 @@
       padding: 16px 24px;
       background: var(--bg-white);
       border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .chat-header-top {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      flex-shrink: 0;
+      margin-bottom: 8px;
     }
 
     .chat-title {
@@ -482,6 +486,16 @@
       height: 8px;
       background: var(--success);
       border-radius: 50%;
+    }
+
+    .chat-status-note {
+      font-size: 11px;
+      color: var(--text-secondary);
+      background: var(--bg-secondary);
+      padding: 6px 12px;
+      border-radius: 6px;
+      line-height: 1.4;
+      border-left: 3px solid var(--primary);
     }
 
     /* Messages */
@@ -820,6 +834,7 @@
       messages: [],
       pollingInterval: null,
       activeTab: 'sessions',
+      anonymousUserMap: new Map(), // Map untuk menyimpan user ID -> nomor anonim
     };
 
     // API Helper
@@ -918,7 +933,7 @@
       container.innerHTML = state.users.map(user => `
         <div class="user-item" data-user-id="${user.userId}">
           <div class="user-item-info">
-            <div class="user-item-name">${escapeHtml(user.displayName)}</div>
+            <div class="user-item-name">Pengguna</div>
             <div class="user-item-status">
               ${user.totalSessions > 1 
                 ? `${user.totalSessions} chat sessions` 
@@ -976,7 +991,7 @@
       container.innerHTML = state.sessions.map(session => {
         const hasUnread = session.unreadCount > 0;
         const lastMsg = session.lastMessage || 'Belum ada pesan';
-        const userInitial = (session.userName || session.topic || 'U').charAt(0).toUpperCase();
+        const userInitial = 'P'; // P untuk Pengguna (anonim)
         
         return `
           <div class="session-item ${session.sessionId === state.currentSessionId ? 'active' : ''} ${hasUnread ? 'has-unread' : ''}" 
@@ -1009,6 +1024,9 @@
     async function selectSession(sessionId) {
       const isNewSession = state.currentSessionId !== sessionId;
       state.currentSessionId = sessionId;
+      
+      // Reset anonymous user map for new session
+      state.anonymousUserMap.clear();
       
       document.querySelectorAll('.session-item').forEach(item => {
         item.classList.toggle('active', item.dataset.sessionId === sessionId);
@@ -1061,10 +1079,15 @@
 
       chatArea.innerHTML = `
         <div class="chat-header">
-          <div class="chat-title">${escapeHtml(session.topic)}</div>
-          <div class="chat-status">
-            <span class="status-dot"></span>
-            Aktif
+          <div class="chat-header-top">
+            <div class="chat-title">${escapeHtml(session.topic)}</div>
+            <div class="chat-status">
+              <span class="status-dot"></span>
+              Aktif
+            </div>
+          </div>
+          <div class="chat-status-note">
+            ⏰ Balasan mungkin tidak langsung. Teman ngobrol akan membalas saat tersedia.
           </div>
         </div>
         <div class="messages-container" id="messagesArea">
@@ -1105,6 +1128,16 @@
       updateMessagesArea();
     }
 
+    // Helper function to get anonymous label for user
+    function getAnonymousLabel(senderId) {
+      if (!state.anonymousUserMap.has(senderId)) {
+        // Assign new number based on current map size + 1
+        const newNumber = state.anonymousUserMap.size + 1;
+        state.anonymousUserMap.set(senderId, newNumber);
+      }
+      return `Anonim ${state.anonymousUserMap.get(senderId)}`;
+    }
+
     // Update only messages area (called during polling)
     function updateMessagesArea() {
       const messagesArea = document.getElementById('messagesArea');
@@ -1122,15 +1155,18 @@
              <div class="empty-chat-title">Belum ada pesan</div>
              <div class="empty-chat-text">Kirim pesan pertama untuk memulai percakapan</div>
            </div>`
-        : state.messages.map(msg => `
+        : state.messages.map(msg => {
+            const senderLabel = msg.isCompanion ? escapeHtml(msg.displayName) : getAnonymousLabel(msg.senderId);
+            return `
             <div class="message ${msg.isCompanion ? 'companion' : 'user'}">
               <div class="message-bubble">${escapeHtml(msg.text)}</div>
               <div class="message-info">
-                <span>${escapeHtml(msg.displayName)}</span>
+                <span>${senderLabel}</span>
                 <span>${formatTime(msg.createdAt)}</span>
               </div>
             </div>
-          `).join('');
+          `;
+          }).join('');
 
       // Scroll to bottom if user was already at bottom
       if (scrolledToBottom || state.messages.length <= 1) {
